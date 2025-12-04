@@ -98,11 +98,11 @@
         statusEl.textContent = "狀態：讀取成功，共取得 " + data.length + " 筆資料";
 
         if (!data || data.length === 0) {
-          listEl.innerHTML = "<li>沒有讀到任何 spacename 資料。</li>";
+          listEl.innerHTML = "<li>沒有讀到任何 SpaceName 資料。</li>";
           return;
         }
 
-        // 將每一筆 spacename 顯示為 <li>
+        // 將每一筆 SpaceName 顯示為 <li>
         data.forEach((row, index) => {
           const li = document.createElement("li");
           li.textContent = (index + 1) + ". " + (row.SpaceName ?? "(null)");
