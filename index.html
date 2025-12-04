@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>TblSpace - 前10筆 SpaceName</title>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial; padding: 24px; background:#f7f9fb; color:#0f1724; }
+    .container { max-width:720px; margin:0 auto; background:#fff; padding:20px; border-radius:10px; box-shadow:0 6px 20px rgba(20,30,50,0.08); }
+    h1 { margin:0 0 12px 0; font-size:20px; }
+    .small { font-size:13px; color:#475569; }
+    label { display:block; margin:12px 0 6px; color:#334155; font-weight:600; font-size:13px; }
+    input[type="text"] { width:100%; padding:10px 12px; border:1px solid #e2e8f0; border-radius:8px; font-size:14px; }
+    button { margin-top:12px; padding:10px 14px; border-radius:8px; border:0; background:#0ea5a4; color:white; font-weight:600; cursor:pointer; }
+    ul.list { margin:18px 0 0 0; padding-left:20px; color:#0f1724; }
+    li.item { margin:8px 0; padding:10px; background:#f1f5f9; border-radius:6px; }
+    .error { color:#b91c1c; margin-top:12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>TblSpace - 顯示前 10 筆 SpaceName</h1>
+    <p class="small">此頁面會先嘗試從同目錄的 config.js 載入 SUPABASE_URL / SUPABASE_ANON_KEY（若你在 repo 放了 config.js）。若沒有，請手動貼入。</p>
+
+    <label for="url">SUPABASE_URL</label>
+    <input id="url" type="text" placeholder="https://xyzcompany.supabase.co" />
+
+    <label for="key">SUPABASE_ANON_KEY</label>
+    <input id="key" type="text" placeholder="公開的 anon key（請勿使用 service_role key）" />
+
+    <button id="btnLoad">載入前 10 筆 SpaceName</button>
+
+    <div id="status" class="small"></div>
+
+    <ul id="list" class="list" aria-live="polite"></ul>
+
+    <div id="error" class="error" role="alert" style="display:none"></div>
+
+    <p class="small" style="margin-top:18px">
+      注意：若使用 GitHub Pages，請確認你的 Supabase 專案允許來自你的網站的請求（CORS）並且資料表的 Row Level Security 或 Policy 允許使用 anon key 的讀取。不要在公開 repo 提供 service_role key！
+    </p>
+  </div>
+
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+
+    const $url = document.getElementById('url');
+    const $key = document.getElementById('key');
+    const $btn = document.getElementById('btnLoad');
+    const $list = document.getElementById('list');
+    const $status = document.getElementById('status');
+    const $error = document.getElementById('error');
+
+    function setStatus(text) { $status.textContent = text; }
+    function showError(text) { $error.style.display = 'block'; $error.textContent = text; }
+    function clearError() { $error.style.display = 'none'; $error.textContent = ''; }
+
+    // 嘗試動態載入 config.js（如果存在）
+    (async function tryLoadConfig() {
+      try {
+        const cfg = await import('./config.js');
+        // 支援兩種命名：export const SUPABASE_URL / SUPABASE_ANON_KEY 或 default export
+        const url = cfg.SUPABASE_URL ?? cfg.default?.SUPABASE_URL;
+        const key = cfg.SUPABASE_ANON_KEY ?? cfg.default?.SUPABASE_ANON_KEY;
+        if (url) $url.value = url;
+        if (key) $key.value = key;
+        if (url && key) {
+          // 若已填入，直接自動載入（可依需求移除自動載入）
+          // await loadSpaceNames();
+        }
+      } catch (err) {
+        // 找不到 config.js 時會進到這裡 — 這是預期行為，不要顯示錯誤給使用者
+        console.info('config.js not found or failed to load (this is fine for manual input).');
+      }
+    })();
+
+    async function loadSpaceNames() {
+      clearError();
+      $list.innerHTML = '';
+      const supabaseUrl = $url.value.trim();
+      const supabaseKey = $key.value.trim();
+
+      if (!supabaseUrl || !supabaseKey) {
+        showError('請先填入 SUPABASE_URL 與 SUPABASE_ANON_KEY。');
+        return;
+      }
+
+      setStatus('建立 Supabase 連線...');
+      const supabase = createClient(supabaseUrl, supabaseKey);
+
+      setStatus('向 TblSpace 資料表查詢前 10 筆 SpaceName...');
+      try {
+        const { data, error } = await supabase
+          .from('TblSpace')
+          .select('SpaceName')
+          .limit(10);
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+          setStatus('查無資料。');
+          return;
+        }
+
+        setStatus(`取得 ${data.length} 筆記錄：`);
+        data.forEach((row, idx) => {
+          const li = document.createElement('li');
+          li.className = 'item';
+          li.textContent = `${idx + 1}. ${row.SpaceName ?? '(空)'}`;
+          $list.appendChild(li);
+        });
+
+      } catch (err) {
+        console.error(err);
+        showError('讀取資料發生錯誤：' + (err.message || String(err)));
+        setStatus('');
+      }
+    }
+
+    $btn.addEventListener('click', () => {
+      $btn.disabled = true;
+      setTimeout(() => $btn.disabled = false, 800);
+      loadSpaceNames();
+    });
+  </script>
+</body>
+</html>
