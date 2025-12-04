@@ -105,7 +105,7 @@
         // 將每一筆 spacename 顯示為 <li>
         data.forEach((row, index) => {
           const li = document.createElement("li");
-          li.textContent = (index + 1) + ". " + (row.spacename ?? "(null)");
+          li.textContent = (index + 1) + ". " + (row.SpaceName ?? "(null)");
           listEl.appendChild(li);
         });
       }
