@@ -82,10 +82,10 @@
         errorEl.textContent = "";
         listEl.innerHTML = "";
 
-        // 等同 SQL: SELECT spacename FROM "TblSpace" LIMIT 10;
+        // 等同 SQL: SELECT SpaceName FROM "TblSpace" LIMIT 10;
         const { data, error } = await supabaseClient
           .from("TblSpace")
-          .select("spacename")
+          .select("SpaceName")
           .limit(10);
 
         if (error) {
