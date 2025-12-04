@@ -25,34 +25,77 @@
       margin: 10px 0;
       white-space: pre-wrap;
     }
-    ul {
+    .search-bar {
+      margin: 10px 0 20px 0;
+    }
+    .search-bar label {
+      margin-right: 8px;
+      font-weight: 600;
+    }
+    .search-bar input {
+      padding: 6px 8px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      min-width: 200px;
+    }
+    .search-bar button {
+      padding: 6px 12px;
+      margin-left: 6px;
+      border-radius: 4px;
+      border: 1px solid #007bff;
+      background-color: #007bff;
+      color: #fff;
+      cursor: pointer;
+    }
+    .search-bar button:hover {
+      opacity: 0.9;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
       background: #fff;
-      padding: 10px 15px;
       border-radius: 8px;
-      list-style-type: none;
+      overflow: hidden;
       box-shadow: 0 1px 4px rgba(0,0,0,0.08);
     }
-    li {
-      padding: 4px 0;
-      border-bottom: 1px solid #eee;
+    thead {
+      background: #f0f0f0;
     }
-    li:last-child {
+    th, td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #eee;
+      font-size: 0.9rem;
+      text-align: left;
+    }
+    tr:last-child td {
       border-bottom: none;
     }
-    code {
-      background: #eee;
-      padding: 2px 4px;
-      border-radius: 4px;
-      font-size: 0.9em;
+    .no-data {
+      padding: 10px;
     }
   </style>
 </head>
 <body>
-  <h1>Supabase 測試：TblSpace 前 10 筆 spacename</h1>
+  <h1>Supabase 測試：TblSpace 查詢</h1>
 
   <div id="status">狀態：準備連線至 Supabase…</div>
   <div id="error"></div>
-  <ul id="space-list"></ul>
+
+  <!-- 🔍 搜尋區：輸入空間名稱 -->
+  <div class="search-bar">
+    <label for="search-input">請輸入空間名稱：</label>
+    <input type="text" id="search-input" placeholder="例如：會議室" />
+    <button id="search-btn">搜尋</button>
+    <button id="reset-btn">顯示前 10 筆</button>
+  </div>
+
+  <!-- 資料表格 -->
+  <table id="space-table" style="display:none;">
+    <thead>
+      <tr id="table-head-row"></tr>
+    </thead>
+    <tbody id="space-tbody"></tbody>
+  </table>
 
   <!-- 1. 先載入存放 URL 與 Key 的 config.js（路徑與檔名請確認） -->
   <script src="./config.js"></script>
@@ -73,45 +116,114 @@
       // 建立 supabase client（v2 寫法）
       const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-      async function loadSpaces() {
+      // 共用函式：把資料顯示成表格（動態依欄位自動產生 7 欄）
+      function renderTable(data) {
+        const table = document.getElementById("space-table");
+        const theadRow = document.getElementById("table-head-row");
+        const tbody = document.getElementById("space-tbody");
+
+        // 先清空
+        theadRow.innerHTML = "";
+        tbody.innerHTML = "";
+
+        if (!data || data.length === 0) {
+          table.style.display = "none";
+          return;
+        }
+
+        // 由第一筆資料自動取得所有欄位名稱
+        const columns = Object.keys(data[0]);
+
+        // 產生表頭
+        columns.forEach(col => {
+          const th = document.createElement("th");
+          th.textContent = col;
+          theadRow.appendChild(th);
+        });
+
+        // 產生每一列資料
+        data.forEach(row => {
+          const tr = document.createElement("tr");
+          columns.forEach(col => {
+            const td = document.createElement("td");
+            td.textContent = row[col] ?? "";
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+
+        table.style.display = "table";
+      }
+
+      // 載入資料：如果有 keyword，做模糊搜尋；否則顯示前 10 筆
+      async function loadSpaces(keyword = "") {
         const statusEl = document.getElementById("status");
         const errorEl = document.getElementById("error");
-        const listEl = document.getElementById("space-list");
 
         statusEl.textContent = "狀態：資料讀取中…";
         errorEl.textContent = "";
-        listEl.innerHTML = "";
 
-        // 等同 SQL: SELECT SpaceName FROM "TblSpace" LIMIT 10;
-        const { data, error } = await supabaseClient
+        let query = supabaseClient
           .from("TblSpace")
-          .select("SpaceName")
-          .limit(10);
+          .select("*");   // 取出所有欄位（7 個欄位）
+
+        if (keyword && keyword.trim() !== "") {
+          // 模糊搜尋：SpaceName 欄位包含關鍵字（不分大小寫）
+          query = query.ilike("SpaceName", `%${keyword.trim()}%`);
+        } else {
+          // 沒有關鍵字時，只顯示前 10 筆
+          query = query.limit(10);
+        }
+
+        const { data, error } = await query;
 
         if (error) {
           statusEl.textContent = "狀態：讀取失敗";
           errorEl.textContent = "錯誤訊息：\n" + error.message;
           console.error("Supabase error:", error);
+          renderTable([]); // 清空表格
           return;
         }
 
-        statusEl.textContent = "狀態：讀取成功，共取得 " + data.length + " 筆資料";
+        statusEl.textContent =
+          "狀態：讀取成功，共取得 " + (data ? data.length : 0) + " 筆資料";
 
         if (!data || data.length === 0) {
-          listEl.innerHTML = "<li>沒有讀到任何 SpaceName 資料。</li>";
+          renderTable([]);
+          const tbody = document.getElementById("space-tbody");
+          const theadRow = document.getElementById("table-head-row");
+          theadRow.innerHTML = "";
+          tbody.innerHTML = "";
+          const table = document.getElementById("space-table");
+          table.style.display = "none";
           return;
         }
 
-        // 將每一筆 SpaceName 顯示為 <li>
-        data.forEach((row, index) => {
-          const li = document.createElement("li");
-          li.textContent = (index + 1) + ". " + (row.SpaceName ?? "(null)");
-          listEl.appendChild(li);
-        });
+        renderTable(data);
       }
 
-      // 一載入頁面就執行查詢
+      // 一載入頁面就先顯示前 10 筆
       loadSpaces();
+
+      // 綁定搜尋按鈕
+      document.getElementById("search-btn").addEventListener("click", () => {
+        const keyword = document.getElementById("search-input").value;
+        loadSpaces(keyword);
+      });
+
+      // 綁定「顯示前 10 筆」按鈕
+      document.getElementById("reset-btn").addEventListener("click", () => {
+        document.getElementById("search-input").value = "";
+        loadSpaces("");
+      });
+
+      // 讓使用者按 Enter 也能搜尋
+      document.getElementById("search-input").addEventListener("keyup", (e) => {
+        if (e.key === "Enter") {
+          const keyword = e.target.value;
+          loadSpaces(keyword);
+        }
+      });
     }
   </script>
 </body>
