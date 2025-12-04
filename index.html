@@ -3,42 +3,57 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>TblSpace - 前10筆 SpaceName</title>
+  <title>TblSpace - 用 SQL 字串查詢前 10 筆 SpaceName</title>
   <style>
-    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial; padding: 24px; background:#f7f9fb; color:#0f1724; }
-    .container { max-width:720px; margin:0 auto; background:#fff; padding:20px; border-radius:10px; box-shadow:0 6px 20px rgba(20,30,50,0.08); }
-    h1 { margin:0 0 12px 0; font-size:20px; }
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial; padding: 20px; background:#f7f9fb; color:#0f1724; }
+    .card { max-width:880px; margin:0 auto; background:#fff; padding:20px; border-radius:10px; box-shadow:0 6px 20px rgba(20,30,50,0.08); }
+    h1 { margin:0 0 8px 0; font-size:20px; }
     .small { font-size:13px; color:#475569; }
     label { display:block; margin:12px 0 6px; color:#334155; font-weight:600; font-size:13px; }
-    input[type="text"] { width:100%; padding:10px 12px; border:1px solid #e2e8f0; border-radius:8px; font-size:14px; }
+    input[type="text"], textarea { width:100%; padding:10px 12px; border:1px solid #e2e8f0; border-radius:8px; font-size:14px; box-sizing:border-box; }
     button { margin-top:12px; padding:10px 14px; border-radius:8px; border:0; background:#0ea5a4; color:white; font-weight:600; cursor:pointer; }
+    button.secondary { background:#64748b; }
     ul.list { margin:18px 0 0 0; padding-left:20px; color:#0f1724; }
     li.item { margin:8px 0; padding:10px; background:#f1f5f9; border-radius:6px; }
+    pre.sql { background:#0f1724; color:#e6fffa; padding:12px; border-radius:8px; overflow:auto; }
+    .notice { margin-top:14px; color:#b45309; }
     .error { color:#b91c1c; margin-top:12px; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>TblSpace - 顯示前 10 筆 SpaceName</h1>
-    <p class="small">此頁面會先嘗試從同目錄的 config.js 載入 SUPABASE_URL / SUPABASE_ANON_KEY（若你在 repo 放了 config.js）。若沒有，請手動貼入。</p>
+  <div class="card">
+    <h1>TblSpace — 使用標準 SQL 字串查詢（示範）</h1>
+    <p class="small">下面會示範如何把查詢寫成標準 SQL 字串 (SELECT ... FROM TblSpace WHERE ...)，並示範兩種執行方式：</p>
+    <ol class="small">
+      <li>安全做法（推薦）：把 SQL 送到你的後端 / serverless function，由後端使用受保護的 DB 連線執行，然後回傳結果。</li>
+      <li>前端示範：顯示等價的 SQL 字串，但在前端用 supabase-js 的 API 執行（這是安全的 anon-key 用法，但不是用「原始 SQL」執行）。</li>
+    </ol>
 
-    <label for="url">SUPABASE_URL</label>
-    <input id="url" type="text" placeholder="https://xyzcompany.supabase.co" />
+    <label for="url">SUPABASE_URL（可選，供 supabase-js 前端呼叫使用）</label>
+    <input id="url" type="text" placeholder="https://your-project.supabase.co" />
 
-    <label for="key">SUPABASE_ANON_KEY</label>
-    <input id="key" type="text" placeholder="公開的 anon key（請勿使用 service_role key）" />
+    <label for="key">SUPABASE_ANON_KEY（僅限前端 anon 使用，切勿放 service_role key）</label>
+    <input id="key" type="text" placeholder="public-anon-key" />
 
-    <button id="btnLoad">載入前 10 筆 SpaceName</button>
+    <label for="sql">SQL（你要執行的標準 SQL 字串）</label>
+    <textarea id="sql" rows="3">SELECT SpaceName FROM TblSpace WHERE SpaceName IS NOT NULL ORDER BY "sID" LIMIT 10;</textarea>
 
-    <div id="status" class="small"></div>
+    <div style="display:flex; gap:10px;">
+      <button id="btnRunServer">透過後端執行 SQL（需要你部署 serverless）</button>
+      <button id="btnRunClient" class="secondary">在前端用 supabase-js (等價執行)</button>
+    </div>
 
-    <ul id="list" class="list" aria-live="polite"></ul>
-
-    <div id="error" class="error" role="alert" style="display:none"></div>
-
-    <p class="small" style="margin-top:18px">
-      注意：若使用 GitHub Pages，請確認你的 Supabase 專案允許來自你的網站的請求（CORS）並且資料表的 Row Level Security 或 Policy 允許使用 anon key 的讀取。不要在公開 repo 提供 service_role key！
+    <p class="small notice">
+      注意：直接在瀏覽器用 raw SQL 呼叫 Supabase 的 SQL endpoint 通常需要 service_role key（高度敏感），請不要把它置於公開前端。若要在前端執行查詢，請使用 anon key 與 supabase-js 的 table API（second button），或將 raw SQL 委託後端執行（第一個按鈕）。
     </p>
+
+    <h3>SQL 字串（顯示）</h3>
+    <pre id="sqlPreview" class="sql"></pre>
+
+    <h3>結果（最多 10 筆 SpaceName）</h3>
+    <div id="status" class="small"></div>
+    <ul id="list" class="list" aria-live="polite"></ul>
+    <div id="error" class="error" role="alert" style="display:none"></div>
   </div>
 
   <script type="module">
@@ -46,63 +61,95 @@
 
     const $url = document.getElementById('url');
     const $key = document.getElementById('key');
-    const $btn = document.getElementById('btnLoad');
+    const $sql = document.getElementById('sql');
+    const $sqlPreview = document.getElementById('sqlPreview');
+    const $btnServer = document.getElementById('btnRunServer');
+    const $btnClient = document.getElementById('btnRunClient');
     const $list = document.getElementById('list');
     const $status = document.getElementById('status');
     const $error = document.getElementById('error');
 
-    function setStatus(text) { $status.textContent = text; }
-    function showError(text) { $error.style.display = 'block'; $error.textContent = text; }
+    function showError(msg) { $error.style.display = 'block'; $error.textContent = msg; }
     function clearError() { $error.style.display = 'none'; $error.textContent = ''; }
+    function setStatus(msg) { $status.textContent = msg; }
 
-    // 嘗試動態載入 config.js（如果存在）
-    (async function tryLoadConfig() {
+    // 顯示 SQL 字串到頁面
+    function updateSqlPreview() {
+      $sqlPreview.textContent = $sql.value.trim();
+    }
+    $sql.addEventListener('input', updateSqlPreview);
+    updateSqlPreview();
+
+    // 1) 透過後端執行 SQL（示範）:
+    // - 頁面會把 SQL 字串 POST 到 /run-sql（你需自行部署 serverless 或後端）
+    // - 後端應使用受保護的 DB 連線（或 service_role）執行 SQL，然後回傳 JSON rows
+    $btnServer.addEventListener('click', async () => {
+      clearError();
+      $list.innerHTML = '';
+      setStatus('正在把 SQL 送到後端執行（POST /run-sql）...');
+      const sqlText = $sql.value.trim();
+      if (!sqlText) { showError('請先輸入 SQL 字串。'); return; }
+
       try {
-        const cfg = await import('./config.js');
-        // 支援兩種命名：export const SUPABASE_URL / SUPABASE_ANON_KEY 或 default export
-        const url = cfg.SUPABASE_URL ?? cfg.default?.SUPABASE_URL;
-        const key = cfg.SUPABASE_ANON_KEY ?? cfg.default?.SUPABASE_ANON_KEY;
-        if (url) $url.value = url;
-        if (key) $key.value = key;
-        if (url && key) {
-          // 若已填入，直接自動載入（可依需求移除自動載入）
-          // await loadSpaceNames();
-        }
-      } catch (err) {
-        // 找不到 config.js 時會進到這裡 — 這是預期行為，不要顯示錯誤給使用者
-        console.info('config.js not found or failed to load (this is fine for manual input).');
-      }
-    })();
+        const res = await fetch('/run-sql', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sql: sqlText })
+        });
 
-    async function loadSpaceNames() {
+        if (!res.ok) {
+          const t = await res.text();
+          throw new Error('後端回傳錯誤: ' + res.status + ' ' + t);
+        }
+
+        const rows = await res.json();
+        if (!Array.isArray(rows) || rows.length === 0) {
+          setStatus('後端執行完成：查無資料或回傳空陣列。');
+          return;
+        }
+        setStatus(`後端執行完成，取得 ${rows.length} 筆：`);
+        rows.forEach((r, i) => {
+          const li = document.createElement('li');
+          li.className = 'item';
+          li.textContent = `${i + 1}. ${r.spacename ?? r.SpaceName ?? '(空)'}`;
+          $list.appendChild(li);
+        });
+
+      } catch (err) {
+        console.error(err);
+        showError('呼叫後端失敗：' + (err.message || err));
+        setStatus('');
+      }
+    });
+
+    // 2) 前端使用 supabase-js 執行等價查詢（anon key）
+    $btnClient.addEventListener('click', async () => {
       clearError();
       $list.innerHTML = '';
       const supabaseUrl = $url.value.trim();
       const supabaseKey = $key.value.trim();
-
       if (!supabaseUrl || !supabaseKey) {
-        showError('請先填入 SUPABASE_URL 與 SUPABASE_ANON_KEY。');
+        showError('請填入 SUPABASE_URL 與 SUPABASE_ANON_KEY（前端 anon key）。');
         return;
       }
-
-      setStatus('建立 Supabase 連線...');
-      const supabase = createClient(supabaseUrl, supabaseKey);
-
-      setStatus('向 TblSpace 資料表查詢前 10 筆 SpaceName...');
+      setStatus('建立 supabase 連線並執行等價查詢...');
       try {
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        // 下面是與 SQL 字串等價的 supabase-js 查詢：
+        // SQL: SELECT SpaceName FROM TblSpace WHERE SpaceName IS NOT NULL ORDER BY "sID" LIMIT 10;
         const { data, error } = await supabase
           .from('TblSpace')
           .select('SpaceName')
+          .not('SpaceName', 'is', null)
+          .order('sID', { ascending: true })
           .limit(10);
 
         if (error) throw error;
-
         if (!data || data.length === 0) {
           setStatus('查無資料。');
           return;
         }
-
-        setStatus(`取得 ${data.length} 筆記錄：`);
+        setStatus(`取得 ${data.length} 筆：`);
         data.forEach((row, idx) => {
           const li = document.createElement('li');
           li.className = 'item';
@@ -115,12 +162,6 @@
         showError('讀取資料發生錯誤：' + (err.message || String(err)));
         setStatus('');
       }
-    }
-
-    $btn.addEventListener('click', () => {
-      $btn.disabled = true;
-      setTimeout(() => $btn.disabled = false, 800);
-      loadSpaceNames();
     });
   </script>
 </body>
