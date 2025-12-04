@@ -1,168 +1,118 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>TblSpace - 用 SQL 字串查詢前 10 筆 SpaceName</title>
+  <meta charset="UTF-8" />
+  <title>Supabase TblSpace 測試頁面</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial; padding: 20px; background:#f7f9fb; color:#0f1724; }
-    .card { max-width:880px; margin:0 auto; background:#fff; padding:20px; border-radius:10px; box-shadow:0 6px 20px rgba(20,30,50,0.08); }
-    h1 { margin:0 0 8px 0; font-size:20px; }
-    .small { font-size:13px; color:#475569; }
-    label { display:block; margin:12px 0 6px; color:#334155; font-weight:600; font-size:13px; }
-    input[type="text"], textarea { width:100%; padding:10px 12px; border:1px solid #e2e8f0; border-radius:8px; font-size:14px; box-sizing:border-box; }
-    button { margin-top:12px; padding:10px 14px; border-radius:8px; border:0; background:#0ea5a4; color:white; font-weight:600; cursor:pointer; }
-    button.secondary { background:#64748b; }
-    ul.list { margin:18px 0 0 0; padding-left:20px; color:#0f1724; }
-    li.item { margin:8px 0; padding:10px; background:#f1f5f9; border-radius:6px; }
-    pre.sql { background:#0f1724; color:#e6fffa; padding:12px; border-radius:8px; overflow:auto; }
-    .notice { margin-top:14px; color:#b45309; }
-    .error { color:#b91c1c; margin-top:12px; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        sans-serif;
+      margin: 20px;
+      padding: 0;
+      background-color: #f7f7f7;
+    }
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 10px;
+    }
+    #status {
+      margin: 10px 0;
+      color: #555;
+    }
+    #error {
+      color: #b00020;
+      margin: 10px 0;
+      white-space: pre-wrap;
+    }
+    ul {
+      background: #fff;
+      padding: 10px 15px;
+      border-radius: 8px;
+      list-style-type: none;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    li {
+      padding: 4px 0;
+      border-bottom: 1px solid #eee;
+    }
+    li:last-child {
+      border-bottom: none;
+    }
+    code {
+      background: #eee;
+      padding: 2px 4px;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>TblSpace — 使用標準 SQL 字串查詢（示範）</h1>
-    <p class="small">下面會示範如何把查詢寫成標準 SQL 字串 (SELECT ... FROM TblSpace WHERE ...)，並示範兩種執行方式：</p>
-    <ol class="small">
-      <li>安全做法（推薦）：把 SQL 送到你的後端 / serverless function，由後端使用受保護的 DB 連線執行，然後回傳結果。</li>
-      <li>前端示範：顯示等價的 SQL 字串，但在前端用 supabase-js 的 API 執行（這是安全的 anon-key 用法，但不是用「原始 SQL」執行）。</li>
-    </ol>
+  <h1>Supabase 測試：TblSpace 前 10 筆 spacename</h1>
 
-    <label for="url">SUPABASE_URL（可選，供 supabase-js 前端呼叫使用）</label>
-    <input id="url" type="text" placeholder="https://your-project.supabase.co" />
+  <div id="status">狀態：準備連線至 Supabase…</div>
+  <div id="error"></div>
+  <ul id="space-list"></ul>
 
-    <label for="key">SUPABASE_ANON_KEY（僅限前端 anon 使用，切勿放 service_role key）</label>
-    <input id="key" type="text" placeholder="public-anon-key" />
+  <!-- 1. 先載入存放 URL 與 Key 的 config.js（路徑與檔名請確認） -->
+  <script src="./config.js"></script>
 
-    <label for="sql">SQL（你要執行的標準 SQL 字串）</label>
-    <textarea id="sql" rows="3">SELECT SpaceName FROM TblSpace WHERE SpaceName IS NOT NULL ORDER BY "sID" LIMIT 10;</textarea>
+  <!-- 2. 載入 Supabase JS SDK (v2, CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 
-    <div style="display:flex; gap:10px;">
-      <button id="btnRunServer">透過後端執行 SQL（需要你部署 serverless）</button>
-      <button id="btnRunClient" class="secondary">在前端用 supabase-js (等價執行)</button>
-    </div>
+  <!-- 3. 主程式：建立連線、查詢 TblSpace、顯示結果 -->
+  <script>
+    // 檢查 config.js 是否正確載入
+    if (typeof SUPABASE_URL === "undefined" || typeof SUPABASE_ANON_KEY === "undefined") {
+      document.getElementById("status").textContent = "狀態：無法找到 SUPABASE_URL 或 SUPABASE_ANON_KEY";
+      document.getElementById("error").textContent =
+        "請確認 config.js 是否在同一個資料夾，且變數名稱正確。";
+    } else {
+      document.getElementById("status").textContent = "狀態：正在連線至 Supabase…";
 
-    <p class="small notice">
-      注意：直接在瀏覽器用 raw SQL 呼叫 Supabase 的 SQL endpoint 通常需要 service_role key（高度敏感），請不要把它置於公開前端。若要在前端執行查詢，請使用 anon key 與 supabase-js 的 table API（second button），或將 raw SQL 委託後端執行（第一個按鈕）。
-    </p>
+      // 建立 supabase client（v2 寫法）
+      const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    <h3>SQL 字串（顯示）</h3>
-    <pre id="sqlPreview" class="sql"></pre>
+      async function loadSpaces() {
+        const statusEl = document.getElementById("status");
+        const errorEl = document.getElementById("error");
+        const listEl = document.getElementById("space-list");
 
-    <h3>結果（最多 10 筆 SpaceName）</h3>
-    <div id="status" class="small"></div>
-    <ul id="list" class="list" aria-live="polite"></ul>
-    <div id="error" class="error" role="alert" style="display:none"></div>
-  </div>
+        statusEl.textContent = "狀態：資料讀取中…";
+        errorEl.textContent = "";
+        listEl.innerHTML = "";
 
-  <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
-
-    const $url = document.getElementById('url');
-    const $key = document.getElementById('key');
-    const $sql = document.getElementById('sql');
-    const $sqlPreview = document.getElementById('sqlPreview');
-    const $btnServer = document.getElementById('btnRunServer');
-    const $btnClient = document.getElementById('btnRunClient');
-    const $list = document.getElementById('list');
-    const $status = document.getElementById('status');
-    const $error = document.getElementById('error');
-
-    function showError(msg) { $error.style.display = 'block'; $error.textContent = msg; }
-    function clearError() { $error.style.display = 'none'; $error.textContent = ''; }
-    function setStatus(msg) { $status.textContent = msg; }
-
-    // 顯示 SQL 字串到頁面
-    function updateSqlPreview() {
-      $sqlPreview.textContent = $sql.value.trim();
-    }
-    $sql.addEventListener('input', updateSqlPreview);
-    updateSqlPreview();
-
-    // 1) 透過後端執行 SQL（示範）:
-    // - 頁面會把 SQL 字串 POST 到 /run-sql（你需自行部署 serverless 或後端）
-    // - 後端應使用受保護的 DB 連線（或 service_role）執行 SQL，然後回傳 JSON rows
-    $btnServer.addEventListener('click', async () => {
-      clearError();
-      $list.innerHTML = '';
-      setStatus('正在把 SQL 送到後端執行（POST /run-sql）...');
-      const sqlText = $sql.value.trim();
-      if (!sqlText) { showError('請先輸入 SQL 字串。'); return; }
-
-      try {
-        const res = await fetch('/run-sql', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sql: sqlText })
-        });
-
-        if (!res.ok) {
-          const t = await res.text();
-          throw new Error('後端回傳錯誤: ' + res.status + ' ' + t);
-        }
-
-        const rows = await res.json();
-        if (!Array.isArray(rows) || rows.length === 0) {
-          setStatus('後端執行完成：查無資料或回傳空陣列。');
-          return;
-        }
-        setStatus(`後端執行完成，取得 ${rows.length} 筆：`);
-        rows.forEach((r, i) => {
-          const li = document.createElement('li');
-          li.className = 'item';
-          li.textContent = `${i + 1}. ${r.spacename ?? r.SpaceName ?? '(空)'}`;
-          $list.appendChild(li);
-        });
-
-      } catch (err) {
-        console.error(err);
-        showError('呼叫後端失敗：' + (err.message || err));
-        setStatus('');
-      }
-    });
-
-    // 2) 前端使用 supabase-js 執行等價查詢（anon key）
-    $btnClient.addEventListener('click', async () => {
-      clearError();
-      $list.innerHTML = '';
-      const supabaseUrl = $url.value.trim();
-      const supabaseKey = $key.value.trim();
-      if (!supabaseUrl || !supabaseKey) {
-        showError('請填入 SUPABASE_URL 與 SUPABASE_ANON_KEY（前端 anon key）。');
-        return;
-      }
-      setStatus('建立 supabase 連線並執行等價查詢...');
-      try {
-        const supabase = createClient(supabaseUrl, supabaseKey);
-        // 下面是與 SQL 字串等價的 supabase-js 查詢：
-        // SQL: SELECT SpaceName FROM TblSpace WHERE SpaceName IS NOT NULL ORDER BY "sID" LIMIT 10;
-        const { data, error } = await supabase
-          .from('TblSpace')
-          .select('SpaceName')
-          .not('SpaceName', 'is', null)
-          .order('sID', { ascending: true })
+        // 等同 SQL: SELECT spacename FROM "TblSpace" LIMIT 10;
+        const { data, error } = await supabaseClient
+          .from("TblSpace")
+          .select("spacename")
           .limit(10);
 
-        if (error) throw error;
-        if (!data || data.length === 0) {
-          setStatus('查無資料。');
+        if (error) {
+          statusEl.textContent = "狀態：讀取失敗";
+          errorEl.textContent = "錯誤訊息：\n" + error.message;
+          console.error("Supabase error:", error);
           return;
         }
-        setStatus(`取得 ${data.length} 筆：`);
-        data.forEach((row, idx) => {
-          const li = document.createElement('li');
-          li.className = 'item';
-          li.textContent = `${idx + 1}. ${row.SpaceName ?? '(空)'}`;
-          $list.appendChild(li);
-        });
 
-      } catch (err) {
-        console.error(err);
-        showError('讀取資料發生錯誤：' + (err.message || String(err)));
-        setStatus('');
+        statusEl.textContent = "狀態：讀取成功，共取得 " + data.length + " 筆資料";
+
+        if (!data || data.length === 0) {
+          listEl.innerHTML = "<li>沒有讀到任何 spacename 資料。</li>";
+          return;
+        }
+
+        // 將每一筆 spacename 顯示為 <li>
+        data.forEach((row, index) => {
+          const li = document.createElement("li");
+          li.textContent = (index + 1) + ". " + (row.spacename ?? "(null)");
+          listEl.appendChild(li);
+        });
       }
-    });
+
+      // 一載入頁面就執行查詢
+      loadSpaces();
+    }
   </script>
 </body>
 </html>
