@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVG Display Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            border: 1px solid #ccc;
+            padding: 20px;
+            width: fit-content;
+        }
+    </style>
+</head>
+<body>
+
+<h2>顯示外部 SVG 檔案</h2>
+
+<div class="container">
+    <!-- 方式 1：最常用、最推薦 -->
+    <img src="svg01.svg" alt="SVG Image" width="600">
+
+    <!-- 方式 2：保留互動性（如動畫 / 點擊事件） -->
+    <!--
+    <object type="image/svg+xml" data="svg01.svg" width="600"></object>
+    -->
+
+    <!-- 方式 3：iframe 顯示 -->
+    <!--
+    <iframe src="svg01.svg" width="600" height="400"></iframe>
+    -->
+</div>
+
+</body>
+</html>
